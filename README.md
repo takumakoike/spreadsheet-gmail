@@ -1,0 +1,2 @@
+# spreadsheet-gmai
+スプレッドシートに何か変更があったらGmailで通知を出すプログラム
