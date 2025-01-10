@@ -3,10 +3,12 @@
  * */ 
 
 // LINEでグループにpush通知するプログラム
-const LINE_TOKEN = 'YOUR_CHANNEL_ACCESS_TOKEN';
+const LINE_TOKEN = PropertiesService.getScriptProperties().getProperty("LINE_ACCESS_TOKEN");
 const LINE_ENDPOINT = 'https://api.line.me/v2/bot/message/push';
 
-function pushToLine(groupId: string, messages: string[]) {
+function pushToLine(groupId: string, messages: any) {
+    const today = Utilities.formatDate(new Date(), "JST", "yyyy年MM月dd日")
+
     const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${LINE_TOKEN}`
@@ -14,10 +16,12 @@ function pushToLine(groupId: string, messages: string[]) {
 
     const postData = {
         'to': groupId,
-        'messages': messages.map(text => ({
-            'type': 'text',
-            'text': text
-        }))
+        "messages": [
+            {
+                "type": "text",
+                "text": `${today}までの連絡事項となります。\n${messages}\n以上となります。ご確認をお願いいたします。`
+            },
+        ]
     };
 
     const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
@@ -29,7 +33,8 @@ function pushToLine(groupId: string, messages: string[]) {
 }
 
 function onButtonClick() {
-    const groupId = 'YOUR_GROUP_ID';  // LINEグループのID
+    const groupId = process.env.TEST_GROUP_LINE;  // テスト用LINEグループのID
+    // const groupId = PropertiesService.getScriptProperties().getProperty("GROUP_LINE_ID");  // 本番用LINEグループのID
     const filteredData = getFilterdData();
     
     if (filteredData.length === 0) {
@@ -37,12 +42,15 @@ function onButtonClick() {
     }
 
     // データを整形してメッセージを作成
-    const messages = filteredData.map(item => 
+    const messages = filteredData.map((item, rowIndex) => {
+        return `【${rowIndex+1}件目】\n` + 
         `店舗名: ${item.店舗名}\n` +
         `記入日: ${item.記入日}\n` +
         `施術業務日: ${item.施術業務日}\n` +
-        `連絡内容: ${item.連絡内容}`
-    );
+        `連絡内容: ${item.連絡内容}`;
+        }
+    ).join("\n\n");
+
 
     pushToLine(groupId, messages);
 }
@@ -86,3 +94,47 @@ function getFilterdData(){
 }
 
 
+function doPost(e){
+    const contents = JSON.parse(e.postData.contents);
+    if(contents.events && contents.events.length > 0) {
+        const event = contents.events[0];
+
+        if(event.type === "join"){
+            const groupId = event.source.groupId;
+            console.log(groupId);
+        }
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "200" })).setMimeType(ContentService.MimeType.JSON);
+
+}
+
+/**
+ * メッセージを送信する
+ * @param {string} groupId グループID
+ * @param {string} message 送信するメッセージ
+ */
+function sendReplyMessage(groupId, message) {
+    const url = 'https://api.line.me/v2/bot/message/push';
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LINE_TOKEN}`,
+    };
+    const payload = {
+        to: groupId,
+        messages: [
+            {
+            type: 'text',
+            text: message,
+            },
+        ],
+    };
+
+    const options = {
+        method: 'post',
+        headers: headers,
+        payload: JSON.stringify(payload),
+    };
+
+    UrlFetchApp.fetch(url, options);
+}
