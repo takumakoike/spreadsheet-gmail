@@ -33,8 +33,8 @@ function pushToLine(groupId: string, messages: any) {
 }
 
 function onButtonClick() {
-    const groupId = process.env.TEST_GROUP_LINE;  // テスト用LINEグループのID
-    // const groupId = PropertiesService.getScriptProperties().getProperty("GROUP_LINE_ID");  // 本番用LINEグループのID
+    const groupId = PropertiesService.getScriptProperties().getProperty("TEST_GROUP_LINE")!;  // テスト用LINEグループのID
+    // const groupId = PropertiesService.getScriptProperties().getProperty("GROUP_LINE_ID")!;  // 本番用LINEグループのID
     const filteredData = getFilterdData();
     
     if (filteredData.length === 0) {
