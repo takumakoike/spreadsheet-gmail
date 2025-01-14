@@ -19,7 +19,7 @@ function pushToLine(groupId: string, messages: any) {
         "messages": [
             {
                 "type": "text",
-                "text": `${today}までの連絡事項となります。\n${messages}\n以上となります。ご確認をお願いいたします。`
+                "text": `先生各位\n${today}までの連絡事項となります。\nご確認の上、修正報告をお願いいたします。\nよろしくお願いいたします。\n\n${messages}\n\n` //最後にGAS側でスプレッドシートリンクを挿入する
             },
         ]
     };
