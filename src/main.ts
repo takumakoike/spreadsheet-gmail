@@ -33,8 +33,13 @@ function pushToLine(groupId: string, messages: any) {
 }
 
 function onButtonClick() {
-    const groupId = PropertiesService.getScriptProperties().getProperty("TEST_GROUP_LINE")!;  // テスト用LINEグループのID
-    // const groupId = PropertiesService.getScriptProperties().getProperty("GROUP_LINE_ID")!;  // 本番用LINEグループのID
+    const sheetName = "シート1";
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const targetSheet = ss.getSheetByName(sheetName);
+    const lastColumn: number = targetSheet?.getLastColumn()!;
+
+    const groupId = PropertiesService.getScriptProperties().getProperty("TEST_GROUP_LINE")!;
+    // const groupId = PropertiesService.getScriptProperties().getProperty("GROUP_LINE_ID");  // 本番用LINEグループのID
     const filteredData = getFilterdData();
     
     if (filteredData.length === 0) {
@@ -42,38 +47,44 @@ function onButtonClick() {
     }
 
     // データを整形してメッセージを作成
-    const messages = filteredData.map((item, rowIndex) => {
-        return `【${rowIndex+1}件目】\n` + 
+    const messages = filteredData.map((item, index) => {
+        return `【${index+1}件目】\n` + 
         `店舗名: ${item.店舗名}\n` +
         `記入日: ${item.記入日}\n` +
         `施術業務日: ${item.施術業務日}\n` +
         `連絡内容: ${item.連絡内容}`;
-        }
-    ).join("\n\n");
+    }).join("\n\n");
 
-
+    // LINE送信
     pushToLine(groupId, messages);
+
+    // 送信後、チェックボックスをTrueに更新
+    filteredData.forEach(item => {
+        targetSheet?.getRange(item.rowIndex, lastColumn).setValue(true);
+    });
 }
 // LINEでグループにpush通知するプログラムここまで
 
 
 // スプレッドシートからデータを取得
-function getDatum(sheetName: string): { dateUnixTime: number, 記入日: string; 施術業務日: string; 店舗名: any; 連絡内容: any; }[] {
+function getDatum(sheetName: string): { dateUnixTime: number, 記入日: string; 施術業務日: string; 店舗名: any; 連絡内容: any; 送信チェック: boolean; rowIndex: number}[] {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const targetSheet = ss.getSheetByName(sheetName);
 
     const lastRow: number | undefined = targetSheet?.getRange(2,2).getNextDataCell(SpreadsheetApp.Direction.DOWN).getRow();
-    // console.log(lastRow);
+    const lastColumn: number = targetSheet?.getLastColumn()!;
 
     if(!lastRow || lastRow < 4) return [];
     const allData = targetSheet?.getRange(4, 2, lastRow-3, 4).getValues();
 
-    return allData?.map((row) => ({
+    return allData?.map((row, index) => ({
         "dateUnixTime": Date.parse(row[0])/1000,
         "記入日": Utilities.formatDate(row[0],"JST", "yyyy/MM/dd"),
         "施術業務日": Utilities.formatDate(row[1],"JST", "yyyy/MM/dd"),
         "店舗名": row[2],
         "連絡内容": row[3],
+        "送信チェック": targetSheet?.getRange(index + 4, lastColumn).getValue(),
+        "rowIndex": index + 4  // 実際の行番号を保持
     })) ?? [];
 }
 
@@ -86,7 +97,7 @@ function getFilterdData(){
     
     // getDatumで取得したデータを一週間以内に絞り込む
     const data = getDatum(sheetName).filter(item => {
-        return item.dateUnixTime >= oneWeekAgo && item.dateUnixTime <= today;
+        return item.dateUnixTime >= oneWeekAgo && item.dateUnixTime <= today && item["送信チェック"] === false;
     });
 
     console.log(data);
@@ -94,7 +105,7 @@ function getFilterdData(){
 }
 
 
-function doPost(e){
+function doPost(e: any){
     const contents = JSON.parse(e.postData.contents);
     if(contents.events && contents.events.length > 0) {
         const event = contents.events[0];
@@ -114,7 +125,7 @@ function doPost(e){
  * @param {string} groupId グループID
  * @param {string} message 送信するメッセージ
  */
-function sendReplyMessage(groupId, message) {
+function sendReplyMessage(groupId: string, message: string) {
     const url = 'https://api.line.me/v2/bot/message/push';
     const headers = {
         'Content-Type': 'application/json',
@@ -130,7 +141,7 @@ function sendReplyMessage(groupId, message) {
         ],
     };
 
-    const options = {
+    const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
         method: 'post',
         headers: headers,
         payload: JSON.stringify(payload),
